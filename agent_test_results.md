@@ -217,3 +217,121 @@ Machine Learning ist heute aus unserem digitalen Alltag nicht mehr wegzudenken u
 
 [Total: 1 Runs, 1192 Tokens]
 ```
+
+# Silver Test Results
+
+### Test 1 — "Was ist die neuste Version von den Python Package PIP?"
+
+| Parameter          | Expected                 | Actual                                                                |
+|--------------------|--------------------------|-----------------------------------------------------------------------|
+| Tools used         | `web_search`             | web_search                                                            |
+| Result correct?    | 26.0.1                   | Yes                                                                   |
+| Loop iterations    | 2 (web_search + run_end) | 3 (web_search <- bad resault, websearch with refined query, end_rund) |
+| Tokens consumed    | —                        | 4435 Tokens                                                           |
+
+#### Console Output
+```
+Your query: Was ist die neuste Version von den Python Package PIP?
+
+============================================================
+USER: Was ist die neuste Version von den Python Package PIP?
+============================================================
+
+--- Loop number: 1 ---
+Stop Reason: tool_use | Tokens: 958
+  → Tool: web_search
+    Input: {"query": "Python PIP latest version 2024"}
+    Tool result: {"query": "Python PIP latest version 2024", "result_count": 3, "results": [{"title": "Python and Pip Versions - Stack Overflow", "url": "https://stackoverflow.com/questions/78468844/python-and-pip-ver...
+
+--- Loop number: 2 ---
+Stop Reason: tool_use | Tokens: 2356
+  → Tool: web_search
+    Input: {"query": "\"pip version\" current latest 2024 python package manager"}
+    Tool result: {"query": "\"pip version\" current latest 2024 python package manager", "result_count": 3, "results": [{"title": "Installation - pip documentation v26.0.1", "url": "https://pip.pypa.io/en/stable/insta...
+
+--- Loop number: 3 ---
+Stop Reason: end_turn | Tokens: 4435
+
+Agent: Basierend auf den Suchergebnissen kann ich sehen, dass die aktuelle Version von PIP **26.0.1** ist. Dies wird in der offiziellen pip-Dokumentation angezeigt ("pip documentation v26.0.1").
+
+Die neueste Version von Python PIP ist **26.0.1** (Stand Ende 2024). Diese Information stammt direkt aus der offiziellen PIP-Dokumentation.
+
+Sie können Ihre aktuelle PIP-Version überprüfen mit dem Befehl:
+```
+pip --version
+```
+
+Und um auf die neueste Version zu aktualisieren, verwenden Sie:
+```
+python -m pip install --upgrade pip
+```
+
+[Total: 3 Runs, 4435 Tokens]
+```
+
+### Test 2 — Conversation history
+
+**Test Queries:**
+1. "Was ist 100 * 42?"
+2. "Was war das Ergebnis von eben nochmal?"
+3. "Und was ist das Doppelte davon?"
+
+**Result**
+SUCCESSFULL - Agent remembers past queries within a runnung session
+
+#### Console Output
+```
+Your query: Was ist 100 * 42?
+
+============================================================
+USER: Was ist 100 * 42?
+============================================================
+
+--- Loop number: 1 ---
+Stop Reason: tool_use | Tokens: 927
+  → Tool: calculator
+    Input: {"expression": "100 * 42"}
+    Tool result: {"expression": "100 * 42", "result": 4200}
+
+--- Loop number: 2 ---
+Stop Reason: end_turn | Tokens: 1896
+
+Agent: 100 * 42 = 4200
+
+[Total: 2 Runs, 1896 Tokens]
+
+Your query: Was war das Ergebnis von eben nochmal?
+
+============================================================
+USER: Was war das Ergebnis von eben nochmal?
+============================================================
+
+--- Loop number: 1 ---
+Stop Reason: end_turn | Tokens: 1020
+
+Agent: Das Ergebnis von der Berechnung eben war 4200.
+
+(100 * 42 = 4200)
+
+[Total: 1 Runs, 1020 Tokens]
+
+Your query: Und was ist das Doppelte davon?
+
+============================================================
+USER: Und was ist das Doppelte davon?
+============================================================
+
+--- Loop number: 1 ---
+Stop Reason: tool_use | Tokens: 1091
+  → Tool: calculator
+    Input: {"expression": "4200 * 2"}
+    Tool result: {"expression": "4200 * 2", "result": 8400}
+
+--- Loop number: 2 ---
+Stop Reason: end_turn | Tokens: 2230
+
+Agent: Das Doppelte von 4200 ist 8400.
+
+[Total: 2 Runs, 2230 Tokens]
+```
+

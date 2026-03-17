@@ -19,7 +19,7 @@ Built as the Week 3 project for the KI & Python Advanced module at Morphos GmbH.
 | Level | What | Status |
 |---|---|---|
 | 🥉 Bronze | Agent loop + 3 tools + 5 test queries | ✅ Done |
-| 🥈 Silver | 4th custom tool + conversation history | ⬜ Todo |
+| 🥈 Silver | 4th custom tool (web search) + conversation history | ✅ Done |
 | 🥇 Gold | Structured output (tool_choice) + error handling | ⬜ Todo |
 
 ---
@@ -31,12 +31,7 @@ Built as the Week 3 project for the KI & Python Advanced module at Morphos GmbH.
 | `calculator` | Evaluates math expressions (all operators, exponentiation) | "Was ist 847 mal 293?" |
 | `current_date` | Returns current date, time, and weekday | "Was ist das heutige Datum?" |
 | `text_analysis` | Word count, sentence count, avg word length, top 5 words | "Analysiere diesen Text: ..." |
-
-### Planned Tools (Silver)
-
-| Tool | Description |
-|---|---|
-| `translator` or `unit_converter` | 4th tool — TBD |
+| `web_search` | DuckDuckGo search — returns titles, URLs, and snippets | "Was ist die neuste Version von PIP?" |
 
 ---
 
@@ -55,17 +50,19 @@ Built as the Week 3 project for the KI & Python Advanced module at Morphos GmbH.
 
 The agent handles **multi-tool queries** — e.g. asking for today's date AND a calculation in one question triggers both tools in a single loop iteration.
 
+The agent also **refines searches autonomously** — if the first web search doesn't yield a clear answer, Claude reformulates the query and searches again without user intervention.
+
 ---
 
 ## 🗂️ Project Structure
 
 ```
 claude-agent-toolbox/
-├── agent.py              ← Main agent — tools, loop, interactive mode
-├── bronze_test_results.md ← Documented test results for 5 test queries
-├── .env                  ← API key (not committed)
-├── .env.example          ← Template for environment variables
-└── requirements.txt      ← Dependencies
+├── agent.py                ← Main agent — tools, loop, interactive mode
+├── agent_test_results.md   ← Documented test results (Bronze + Silver)
+├── .env                    ← API key (not committed)
+├── .env.example            ← Template for environment variables
+└── requirements.txt        ← Dependencies
 ```
 
 ---
@@ -108,9 +105,11 @@ python agent.py
 
 ---
 
-## 🧪 Test Results (Bronze)
+## 🧪 Test Results
 
-5 mandatory test queries — documented in `bronze_test_results.md`:
+All test results are documented in `agent_test_results.md`.
+
+### Bronze — 5 Mandatory Queries
 
 | # | Query | Expected Tool | Result |
 |---|---|---|---|
@@ -120,6 +119,13 @@ python agent.py
 | 4 | Date + calculation (multi-tool) | `current_date` + `calculator` | ✅ |
 | 5 | "Erkläre mir was Machine Learning ist." | NONE (pure LLM) | ✅ |
 
+### Silver — Web Search + Conversation Memory
+
+| # | Test | Result |
+|---|---|---|
+| 1 | Web search: "Was ist die neuste Version von PIP?" | ✅ Found v26.0.1 (autonomous query refinement) |
+| 2 | Conversation memory: 3-query chain (calculate → recall → double) | ✅ Agent remembers across turns |
+
 ---
 
 ## ✨ Extra Features
@@ -127,7 +133,9 @@ python agent.py
 | Feature | Description |
 |---|---|
 | **Config class** | Centralized settings — model, max tokens, max iterations, system prompt |
-| **NLTK stopword filtering** | Text analysis filters German stopwords (articles, pronouns, etc.) for more meaningful word frequency results |
+| **NLTK stopword filtering** | Text analysis filters German stopwords for more meaningful word frequency results |
+| **DuckDuckGo web search** | Free web search via `ddgs` package — no API key required |
+| **Conversation memory** | Agent remembers all previous queries and answers within a session |
 | **English codebase** | All variables, comments, and docstrings in English — agent responds in German |
 | **Token tracking** | Every agent run logs input + output tokens per loop iteration |
 
@@ -137,8 +145,6 @@ python agent.py
 
 | Feature | Challenge Level | Description |
 |---|---|---|
-| 4th custom tool | 🥈 Silver | Translator or unit converter |
-| Conversation history | 🥈 Silver | Agent remembers previous questions across turns |
 | Structured output | 🥇 Gold | Force JSON schema via `tool_choice` |
 | Error handling wrapper | 🥇 Gold | Agent never crashes on bad tool input |
 | Reflection document | 🥇 Gold | `reflexion.md` with technical answers + CV bullet point |
@@ -153,6 +159,7 @@ python agent.py
 | **Claude Sonnet 4** | Model for agent reasoning |
 | **Python** | Agent loop, tool execution |
 | **NLTK** | German stopword filtering |
+| **ddgs** | DuckDuckGo web search |
 
 ---
 

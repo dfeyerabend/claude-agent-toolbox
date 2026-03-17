@@ -1,3 +1,4 @@
+# === IMPORTS & CONFIG ===
 import anthropic
 import json
 from datetime import datetime
@@ -7,19 +8,19 @@ load_dotenv()
 
 client = anthropic.Anthropic()
 
+# === CONFIGURATION ===
 class Config:
     # Claude Settings
     MODEL = "claude-sonnet-4-20250514"
     MAX_TOKENS = 1024
     MAX_ITERATIONS = 10
     SYSTEM_PROMPT = (
-        """
-        You are a helpful assistant. You have access to tools.
-        You use a tool when needed. Always respond in German.
-        When you need a tool, use it — don't guess.
-        """
+        "You are a helpful assistant. You have access to tools. "
+        "You use a tool when needed. Always respond in German. "
+        "When you need a tool, use it — don't guess."
     )
 
+# === TOOL DEFINITIONS ===
 tools = [
     {
         "name": "calculator",
@@ -67,32 +68,57 @@ tools = [
             },
             "required": ["text"]
         }
+    },
+
+    {
+        "name": "web_search",
+        "description": (
+            "Searches the web using DuckDuckGo and returns titles, URLs, and text snippets. "
+            "Use this tool when the user asks about current events or facts you are unsure about, "
+            "or anything that requires up-to-date information from the internet. "
+            "Do NOT use for questions you can confidently answer from your own knowledge."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query, e.g. 'current chancellor of Germany' or 'Python 3.12 new features'"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Number of results to return (1-5). Default is 3.",
+                    "default": 3
+                }
+            },
+            "required": ["query"]
+        }
     }
 ]
 
-print(f"{len(tools)} Tools defined: {[t['name'] for t in tools]}")
-
+# === STOPWORD FILTER ===
 import nltk
-nltk.download('stopwords')
+nltk.download('stopwords', quiet=True)
 from nltk.corpus import stopwords
 
 german_stopwords = set(stopwords.words('german'))
 
-def run_tool(name, input):
+# === TOOL EXECUTION ===
+def run_tool(name, tool_input):
     """
-    Executes a Tool locally and returns the result as string.
-    :param name:
-    :param input:
-    :return:
+    Executes a tool locally and returns the result as JSON string.
+    :param name: Tool name matching a tool definition
+    :param tool_input: Dict with tool-specific input parameters
+    :return: JSON string with tool result or error
     """
 
     if name == "calculator":
         try:
             # eval() ist in Production ein Sicherheitsrisiko — nur für Demo!
             # In Production: ast.literal_eval() oder eine Math-Library
-            result = eval(input["expression"])
+            result = eval(tool_input["expression"])
             return json.dumps({
-                "expression": input["expression"],
+                "expression": tool_input["expression"],
                 "result": result
             }, ensure_ascii=False)
 
@@ -118,7 +144,7 @@ def run_tool(name, input):
 
     elif name == "text_analysis":
         try:
-            text = input["text"]
+            text = tool_input["text"]
             words = text.split()
             sentences = text.count('.') + text.count('!') + text.count('?')
             symbols = len(text)
@@ -144,24 +170,62 @@ def run_tool(name, input):
                 "error": f"Test analysis failed: {str(e)}",
             })
 
+    elif name == "web_search":
+        try:
+            from ddgs import DDGS # only load if needed
+
+            query = tool_input["query"]
+            max_results = tool_input.get("max_results", 3) # <- default value wenn Claude nicht mitschickt
+
+            # DDGS().text() returns a list of dicts, each with:
+            #   - "title": page title
+            #   - "href": URL
+            #   - "body": text snippet (usually 1-2 sentences) <- so no summary logic needed
+            raw_results = DDGS().text(query, max_results=max_results) # Only pass what Claude actually needs — title, url, snippet
+
+            clean_results = []
+            for r in raw_results:
+                clean_results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "snippet": r.get("body", ""),
+                })
+
+            return json.dumps({
+                "query": query,
+                "result_count": len(clean_results),
+                "results": clean_results,
+            }, ensure_ascii=False)
+
+        except Exception as e:
+            return json.dumps({
+                "error": f"Web search failed: {str(e)}",
+            })
+
     else:
         return json.dumps({"error": f"Unknown tool: {name}"})
 
+# === CONVERSATION STATE ===
+# Persists across agent runs for conversation memory (Silver)
+conversation_history = []
 
-def agent_run(user_query, max_interations, model, system_prompt, max_tokens):
+# === AGENT LOOP ===
+def agent_run(user_query, max_iterations, model, system_prompt, max_tokens):
     """
-    Sends a query to the agent and executes tool-use loop
-    :param query:
-    :return:
+    Sends a query to the agent and executes the tool-use loop.
+    Uses conversation_history for cross-query memory (Silver).
+    :param user_query: The user's question as string
+    :param max_iterations: Safety limit for loop iterations
+    :param model: Claude model identifier
+    :param system_prompt: System prompt for Claude
+    :param max_tokens: Max tokens per API response
     """
 
     print(f"\n{'='*60}")
     print(f"USER: {user_query}")
     print(f"{'='*60}")
 
-    messages = [
-        {"role": "user", "content": user_query},
-    ]
+    conversation_history.append({"role": "user", "content": user_query})
 
     run_count = 0
     total_tokens = 0
@@ -176,7 +240,7 @@ def agent_run(user_query, max_interations, model, system_prompt, max_tokens):
             max_tokens = max_tokens,
             system = system_prompt,
             tools = tools,
-            messages = messages
+            messages = conversation_history
         )
 
         # Token tracking
@@ -187,6 +251,8 @@ def agent_run(user_query, max_interations, model, system_prompt, max_tokens):
         # Logic for proceeding
         # Case 1: Claude is finished - return final answer and run statistics
         if response.stop_reason == "end_turn":
+            # Add final message to history
+            conversation_history.append({"role": "assistant", "content": response.content})
             for block in response.content:
                 if hasattr(block, "text"):
                     print(f"\nAgent: {block.text}")
@@ -195,8 +261,9 @@ def agent_run(user_query, max_interations, model, system_prompt, max_tokens):
 
         # Case 2: Claude wants to use a Tool
         elif response.stop_reason == "tool_use":
+
             # Append assistant answer to history
-            messages.append({"role": "assistant", "content": response.content})
+            conversation_history.append({"role": "assistant", "content": response.content})
 
             # Execute tool
             tool_results = []
@@ -216,17 +283,19 @@ def agent_run(user_query, max_interations, model, system_prompt, max_tokens):
                     })
 
             # Return tool results to claude
-            messages.append({"role": "user", "content": tool_results})
+            conversation_history.append({"role": "user", "content": tool_results})
 
         # Savety stop to precent endless loops
-        if run_count >= max_interations:
+        if run_count >= max_iterations :
             print("Warning: Maximal number of iterations reached. Stopping Agent call")
             return
 
 
+
+# === INTERACTIVE MODE ===
 if __name__ == "__main__":
     print("=" * 60)
-    print("AGENT Started — 3 Tools: calculator, current_date, text_analysis")
+    print(f"AGENT Started — {len(tools)} Tools defined: {[t['name'] for t in tools]}")
     print("Enter 'quit' to terminate run")
     print("=" * 60)
 
@@ -237,4 +306,4 @@ if __name__ == "__main__":
             break
         if query.strip() == "":
             continue
-        agent_run(query, model=Config.MODEL, system_prompt=Config.SYSTEM_PROMPT, max_tokens=Config.MAX_TOKENS, max_interations=Config.MAX_ITERATIONS)
+        agent_run(query, model=Config.MODEL, system_prompt=Config.SYSTEM_PROMPT, max_tokens=Config.MAX_TOKENS, max_iterations=Config.MAX_ITERATIONS)
